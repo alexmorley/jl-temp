@@ -1,0 +1,8 @@
+.jp-Dialog-body > menu > div {
+  display: none;
+}
+.jp-Dialog-body > menu > label {
+  padding-top: 10px;   
+  font-size: 12pt;
+  display : block;
+}
