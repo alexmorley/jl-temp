@@ -1,4 +1,10 @@
 .jp-Dialog-body > menu > div {
+  padding-top: 10px;   
+  font-size: 12pt;
+  display : block;
+}
+/*
+.jp-Dialog-body > menu > div {
   display: none;
 }
 .jp-Dialog-body > menu > label {
@@ -6,3 +12,7 @@
   font-size: 12pt;
   display : block;
 }
+
+.jp-Dialog-body > menu > input {
+  display : inline;
+}*/
