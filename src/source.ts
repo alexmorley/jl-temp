@@ -6,26 +6,34 @@ export
 class TemplateSourcer {
   info : any = {};
   sources : Array<Source>;
-  constructor(source : Source) {
+  constructor(sources : Array<Source>) {
     this.info = {};
-    this.sources = [source];
+    this.sources = sources;
   }
   public fetchFile(id : string): Promise<string> {
-    // Get information about the notebook from it's unique id
-    let nb_info = this.info[id];
-    // Use the path and source of the notebook to get its contents
-    return nb_info.source.get(nb_info.path) // return notebook contents
+    // Get information about the file from it's unique id
+    let info = this.info[id];
+    // Use the path and source of the file to get its contents
+    return info.source.get(info.path) // return notebook contents
   }
 
   public fetchIndex(): Promise<any> {
-    let templates : Array<string> = [];
-    let source = this.sources[0];
-    return source.getInfo()
-    .then( t => {
-      templates.push(t);
-      this.info = t;
-      return t
-    });
+    //let templates : Array<string> = [];
+    let gotInfo : Array<Promise<any>>= [];
+    for(const source of this.sources) {
+      const p = source.getInfo().then(t => {
+        console.log(t);
+        for(const k in t) {
+          this.info[k] = t[k];
+        }
+      }).catch( (err) => { console.log(err) }) //err+' in '+source) })
+      gotInfo.push(p);
+    }
+    return Promise.all(gotInfo).then(() => {
+      console.log(gotInfo);
+      console.log(this.info);
+      return this.info;
+    })
   }
 }
 
@@ -65,6 +73,7 @@ export class StaticWebSource extends Source {
     return request("get", this.url + path)
     .then((res: IRequestResult) => {
       if (res.ok) {
+        console.log(res.data);
         return res.data
       } else {
         return {}
