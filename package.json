@@ -1,5 +1,5 @@
 {
-  "name": "jupyterlab_templates2",
+  "name": "@alexmorley/jupyterlab_templates2",
   "version": "0.1.0",
   "description": "Allow making new notebooks & other files from parameterised templates.",
   "keywords": [
