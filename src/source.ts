@@ -10,6 +10,7 @@ class TemplateSourcer {
     this.info = {};
     this.sources = sources;
   }
+
   public fetchFile(id : string): Promise<string> {
     // Get information about the file from it's unique id
     let info = this.info[id];
@@ -17,17 +18,21 @@ class TemplateSourcer {
     return info.source.get(info.path) // return notebook contents
   }
 
-  public fetchIndex(): Promise<any> {
-    //let templates : Array<string> = [];
+  public async fetchIndex(): Promise<any> {
     let gotInfo : Array<Promise<any>>= [];
     for(const source of this.sources) {
-      const p = source.getInfo().then(t => {
-        console.log(t);
-        for(const k in t) {
-          this.info[k] = t[k];
-        }
-      }).catch( (err) => { console.log(err) }) //err+' in '+source) })
-      gotInfo.push(p);
+      if (source.selected) {
+        const p = source.getInfo().then(t => {
+          console.log(t);
+          for(const k in t) {
+            this.info[k] = t[k];
+          }
+        }).catch( (err) => {
+          source.status = new Status(false, 'error fetching info', err);
+        }) //err+' in '+source) })
+        source.status = new Status(true, 'success');
+        gotInfo.push(p);
+      }
     }
     return Promise.all(gotInfo).then(() => {
       console.log(gotInfo);
@@ -39,11 +44,13 @@ class TemplateSourcer {
 
 export abstract class Source {
   abstract get(url : string): Promise<any>;
+  abstract status : Status;
+  abstract selected : boolean;
   abstract url : string;
   abstract name : string;
   abstract filetype: string;
 
-  public getInfo() : Promise<any> {
+  public async getInfo() : Promise<any> {
     return this.get('/info/' + this.filetype + '.json').then(input_info_string => {
       const input_info = JSON.parse(input_info_string) as {[key: string] : {[key: string] : any}};
       const info : {[key: string] : {[key: string] : string}} = {};
@@ -62,37 +69,45 @@ export class StaticWebSource extends Source {
   url : string = '';
   name : string;
   filetype : string;
+  status : Status;
+  selected : boolean;
+
   constructor(name : string, url : string, filetype : string) {
     super()
     this.url = url + '/'; 
     this.name = name;
     this.filetype = filetype;
+    this.status = new Status(false, 'starting');
+    this.status.active = false;
+    this.selected = true;
   }
-  public get(path : string) : Promise<any> {
+
+  public async get(path : string) : Promise<any> {
     console.log(this.url+path);
     return request("get", this.url + path)
     .then((res: IRequestResult) => {
       if (res.ok) {
-        console.log(res.data);
+        this.status = new Status(true, 'get request succeeded', res);
         return res.data
       } else {
+        this.status = new Status(false, 'get request failed', res);
         return {}
       }
     });
   }
 }
-/*
-class TemplateInfo {
-  id: string
-  pretty_name: string
-  parameters: object
-  constructor(obj : object) {
-    this.id = obj['id'];
-    this.pretty_name = obj.pretty_name;
-    this.parameters = obj.parameters;
+
+class Status {
+  active : boolean;
+  message : string;
+  error : any;
+  constructor(active : boolean, message :string, error : any = undefined) {
+    this.active = active;
+    this.message = message;
+    this.error = error;
   }
 }
- */
+
 function hash(str : string) : number{
   let hash : number = 0;
   if (str.length == 0) {
@@ -105,4 +120,3 @@ function hash(str : string) : number{
   }
   return hash;
 }
-

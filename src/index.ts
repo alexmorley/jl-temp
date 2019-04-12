@@ -14,10 +14,6 @@ import {
   IFileBrowserFactory,
 } from "@jupyterlab/filebrowser";
 
-/*import {
-  ILauncher,
-} from "@jupyterlab/launcher";*/
-
 import {
   IMainMenu,
 } from "@jupyterlab/mainmenu";
@@ -36,6 +32,7 @@ import {
   StaticWebSource,
   Source
 } from './source';
+
 
 import "../style/index.css";
 
@@ -62,14 +59,14 @@ class OpenTemplate {
     this.widget = new OpenTemplateWidget();
     this.source = templateSource;
   }
-  public init() {
+  public async init() {
     return this.source.fetchIndex()
       .then(
         templates => {
           for (let k in templates) {
             const t = templates[k];
             const val = document.createElement("option");
-            val.label = t.pretty_name;
+            val.label = t.source.name + '/' + t.pretty_name;
             val.text  = t.pretty_name;
             val.value = k;
             this.widget.inputNode.appendChild(val);
@@ -104,15 +101,17 @@ class OpenTemplate {
       if(t[0] == "name") {
         const param : string = t[1];
         if(!(param in this.view)) {
+          const div = document.createElement("div");
+          this.paramsNode.lastElementChild.after(div);
           const label = document.createElement("label");
           label.textContent = param + ':';
-          this.paramsNode.lastElementChild.after(label);
+          div.appendChild(label);
           const input = document.createElement("input");
           input.onkeyup = () => {
             this.view[param] = input.value;
           }
           this.view[param] = input.value;
-          this.paramsNode.lastElementChild.after(input);
+          div.appendChild(input);
         }
       }
     }
@@ -156,30 +155,76 @@ function activate(app: JupyterLab,
   menu: IMainMenu,
   browser: IFileBrowserFactory) {
 
-  // Add an application command
-  const open_notebook_command = "template:open-notebook";
-  const nb_source : Source = new StaticWebSource('jl-t-nb',
+  const add_new_source_command = "template:add-new-source"
+  app.commands.addCommand(add_new_source_command, {
+    caption: "Add a new source for fetching templates",
+    execute: addNewSourceCommand,
+    iconClass: 'jp-AddIcon',
+    isEnabled: () => true,
+    label: 'Add new'
+  });
+
+  const nb_remote_source : Source = new StaticWebSource('main',
     'https://jupyterlab-templates.netlify.com',
     'notebook');
-  app.commands.addCommand(open_notebook_command, {
+  const nb_local_source : Source = new StaticWebSource('local',
+    'http://localhost:8000',
+    'notebook');
+  const text_remote_source : Source = new StaticWebSource('main',
+    'https://jupyterlab-templates.netlify.com/',
+    'markdown');
+  const text_local_source : Source = new StaticWebSource('local',
+    'http://localhost:8000',
+    'markdown');
+  let sources = [
+    nb_remote_source,
+    nb_local_source,
+    text_remote_source,
+    text_local_source
+  ]
+  const templateSource = new TemplateSourcer(sources);
+
+  // Add an application command
+  const open_notebook_command = "template:open-notebook";
+   app.commands.addCommand(open_notebook_command, {
     caption: "Initialize a notebook from a template notebook",
-    execute: openCommand(nb_source),
+    execute: openCommand(templateSource),
     iconClass: "jp-NotebookIcon",
     isEnabled: () => true,
     label: "Notebook"
   });
 
   const open_text_command = "template:open-text";
-  const text_source : Source = new StaticWebSource('jl-t-md',
-    'https://jupyterlab-templates.netlify.com/',
-    'markdown');
   app.commands.addCommand(open_text_command, {
     caption: "Initialize a markdown file from a template markdown file",
-    execute: openCommand(text_source),
+    execute: openCommand(templateSource),
     iconClass: "jp-TextEditorIcon",
     isEnabled: () => true,
     label: "Text"
   });
+
+  const activate_source_command = "template:toggle-source";
+  app.commands.addCommand(activate_source_command, {
+    label: args => {
+        return args['name'] as string;
+    },
+    execute: args => {
+      console.log(args);
+      //updateTracker();
+      //return settingRegistry.set(id, key, value).catch((reason: Error) => {
+      //  console.error(`Failed to set ${id}:${key} - ${reason.message}`);
+      //});
+    },
+    iconClass: args => {
+      if(args['filetype'] == 'notebook') {
+        return "jp-NotebookIcon" 
+      } else {
+        return "jp-TextEditorIcon"
+      }
+    },
+    isToggled: args => args['name'] === name,
+  });
+
 
   if (menu) {
     // Add the editing commands to the settings menu.
@@ -197,14 +242,33 @@ function activate(app: JupyterLab,
       ],
       40
     );
+    const templateMenu2 = new Menu({commands:app.commands});
+    templateMenu2.addItem({ command: add_new_source_command, args: {
+    }});
+    templateMenu2.title.label = 'Template Settings';
+    for(const s of templateSource.sources) {
+      templateMenu2.addItem({ command: activate_source_command, args: {
+        name: s.name, filetype: s.filetype,
+      },
+      });
+    }
+    menu.settingsMenu.addGroup(
+      [
+        { type: 'submenu', submenu: templateMenu2 },
+      ],
+      40
+    );
   }
 
-  function openCommand(source : Source) {
+  function addNewSourceCommand() {
+    console.log('it worked!');
+  }
+
+  function openCommand(templateSource : TemplateSourcer) {
     return ((args : any) => {
       const type = (args['type'] as string) || '';
       const ext = (args['ext'] as string) || '';
 
-      const templateSource = new TemplateSourcer(source);
       const openTemplate = new OpenTemplate(templateSource);
       openTemplate.init()
         .then( () => {

@@ -1,6 +1,11 @@
 #### Full file templates
+##### P1
 Think about configuration (mainly to set sources).  
-`TemplateSourcer` needs to handle multiple sources (source is part of hash so collisions are unlikely but currently the id => object mapping only takes a single source).
+Add local source.
+Proper Dialog error when no sources can be found or file is not retrievable.
+Add tutorial on how to create a custom source.
+
+##### P2
 Make the MustacheEngine a bit more type strict.
 
 #### Cell templates
