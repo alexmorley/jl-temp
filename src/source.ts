@@ -5,10 +5,26 @@ import {
 export
 class TemplateSourcer {
   info : any = {};
-  sources : Array<Source>;
+  sourcemap : Map<string,Source> = new Map();
   constructor(sources : Array<Source>) {
     this.info = {};
-    this.sources = sources;
+    this.sourcemap = sources.reduce((obj, item) => {
+      obj.set(item.name + '-' + item.filetype, item);
+      return obj
+    }, this.sourcemap)
+  }
+
+  get sources() {
+    return this.sourcemap.values();
+  }
+
+  public clearInfo() : void {
+    this.info = {};
+  }
+
+  public getSource(name : string, filetype : string) : Source {
+      const index : string = name + '-' + filetype;
+      return this.sourcemap.get(index);
   }
 
   public fetchFile(id : string): Promise<string> {
@@ -18,10 +34,10 @@ class TemplateSourcer {
     return info.source.get(info.path) // return notebook contents
   }
 
-  public async fetchIndex(): Promise<any> {
+  public async fetchIndex(type : string): Promise<any> {
     let gotInfo : Array<Promise<any>>= [];
     for(const source of this.sources) {
-      if (source.selected) {
+      if ((source.selected) && (source.filetype == type)) {
         const p = source.getInfo().then(t => {
           console.log(t);
           for(const k in t) {
@@ -35,8 +51,6 @@ class TemplateSourcer {
       }
     }
     return Promise.all(gotInfo).then(() => {
-      console.log(gotInfo);
-      console.log(this.info);
       return this.info;
     })
   }

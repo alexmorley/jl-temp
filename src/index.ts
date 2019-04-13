@@ -59,8 +59,8 @@ class OpenTemplate {
     this.widget = new OpenTemplateWidget();
     this.source = templateSource;
   }
-  public async init() {
-    return this.source.fetchIndex()
+  public async init(type : string) {
+    return this.source.fetchIndex(type)
       .then(
         templates => {
           for (let k in templates) {
@@ -80,7 +80,6 @@ class OpenTemplate {
 
   public populateParameters(context : OpenTemplate) {
     return function () {
-      console.log(context.inputNode.value);
       context.source.fetchFile(context.inputNode.value).then((contents) => {
         context.contents = contents;
         context.showParameters(Mustache.parse(contents, Mustache.tags));
@@ -164,25 +163,22 @@ function activate(app: JupyterLab,
     label: 'Add new'
   });
 
-  const nb_remote_source : Source = new StaticWebSource('main',
-    'https://jupyterlab-templates.netlify.com',
-    'notebook');
-  const nb_local_source : Source = new StaticWebSource('local',
-    'http://localhost:8000',
-    'notebook');
-  const text_remote_source : Source = new StaticWebSource('main',
-    'https://jupyterlab-templates.netlify.com/',
-    'markdown');
-  const text_local_source : Source = new StaticWebSource('local',
-    'http://localhost:8000',
-    'markdown');
-  let sources = [
-    nb_remote_source,
-    nb_local_source,
-    text_remote_source,
-    text_local_source
+  let default_sources = [
+    new StaticWebSource('main',
+      'https://jupyterlab-templates.netlify.com',
+      'notebook'),
+    new StaticWebSource('local',
+      'http://localhost:8000',
+      'notebook'),
+    new StaticWebSource('main',
+      'https://jupyterlab-templates.netlify.com/',
+      'markdown'),
+    new StaticWebSource('local',
+      'http://localhost:8000',
+      'markdown')
   ]
-  const templateSource = new TemplateSourcer(sources);
+   
+  const templateSource = new TemplateSourcer(default_sources);
 
   // Add an application command
   const open_notebook_command = "template:open-notebook";
@@ -209,20 +205,29 @@ function activate(app: JupyterLab,
         return args['name'] as string;
     },
     execute: args => {
-      console.log(args);
+      const source : Source = templateSource.getSource(args['name'] as string, args['filetype'] as string);
+      source.selected = (!(source.selected));
+      templateSource.clearInfo();
       //updateTracker();
       //return settingRegistry.set(id, key, value).catch((reason: Error) => {
       //  console.error(`Failed to set ${id}:${key} - ${reason.message}`);
       //});
     },
     iconClass: args => {
-      if(args['filetype'] == 'notebook') {
-        return "jp-NotebookIcon" 
+      const selected = templateSource.getSource(args['name'] as string, args['filetype'] as string).selected;
+      if (selected) {
+        return 'p-Menu-itemIcon';
       } else {
-        return "jp-TextEditorIcon"
+        if(args['filetype'] == 'notebook') {
+          return "jp-NotebookIcon" 
+        } else {
+          return "jp-TextEditorIcon"
+        }
       }
     },
-    isToggled: args => args['name'] === name,
+    isToggled: args => {
+      return templateSource.getSource(args['name'] as string, args['filetype'] as string).selected;
+    } 
   });
 
 
@@ -266,11 +271,12 @@ function activate(app: JupyterLab,
 
   function openCommand(templateSource : TemplateSourcer) {
     return ((args : any) => {
+      console.log(args);
       const type = (args['type'] as string) || '';
       const ext = (args['ext'] as string) || '';
 
       const openTemplate = new OpenTemplate(templateSource);
-      openTemplate.init()
+      openTemplate.init(type)
         .then( () => {
           openTemplate.populateParameters(openTemplate)();
           return showDialog({
